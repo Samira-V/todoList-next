@@ -1,5 +1,3 @@
-// app/api/auth/me/route.js
-
 import connectToDB from "@/configs/db";
 import UserModel from "@/models/User";
 import { verifyToken } from "@/utils/auth";
@@ -10,19 +8,25 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    // =========================
-    // Connect DB
-    // =========================
+    // ==============================
+    // Connect Database
+    // ==============================
 
     await connectToDB();
 
-    // =========================
+
+    // ==============================
     // Get Cookie
-    // =========================
+    // ==============================
 
     const cookieStore = await cookies();
 
     const token = cookieStore.get("token")?.value;
+
+
+    // ==============================
+    // Check Token
+    // ==============================
 
     if (!token) {
       return NextResponse.json(
@@ -36,19 +40,15 @@ export async function GET() {
       );
     }
 
-    // =========================
-    // Verify JWT
-    // =========================
 
-    let decoded;
+    // ==============================
+    // Verify Token
+    // ==============================
 
-    try {
-      decoded = verifyToken(token);
-    } catch (error) {
-      decoded = null;
-    }
+    const decoded = verifyToken(token);
 
-    if (!decoded || !decoded.userId) {
+
+    if (!decoded) {
       return NextResponse.json(
         {
           success: false,
@@ -60,14 +60,32 @@ export async function GET() {
       );
     }
 
-    // =========================
+
+    // ==============================
+    // Check userId
+    // ==============================
+
+    if (!decoded.userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid token payload",
+        },
+        {
+          status: 401,
+        }
+      );
+    }
+
+
+    // ==============================
     // Find User
-    // =========================
+    // ==============================
 
     const user = await UserModel
       .findById(decoded.userId)
-      .select("_id name email")
-      .lean();
+      .select("name email");
+
 
     if (!user) {
       return NextResponse.json(
@@ -81,12 +99,14 @@ export async function GET() {
       );
     }
 
-    // =========================
+
+    // ==============================
     // Response
-    // =========================
+    // ==============================
 
     return NextResponse.json({
       success: true,
+
       user: {
         id: user._id.toString(),
         name: user.name,
@@ -95,7 +115,11 @@ export async function GET() {
     });
 
   } catch (error) {
-    console.error("ME API Error:", error);
+
+    console.error(
+      "ME API Error:",
+      error
+    );
 
     return NextResponse.json(
       {

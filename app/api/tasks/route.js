@@ -1,55 +1,43 @@
-import connectToDB from '@/configs/db';
-import TodoModel from '@/models/Todo';
-import { verifyToken } from '@/utils/auth';
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
-import {
-  isValidCategory,
-} from '@/utils/category';
+import connectToDB from "@/configs/db";
+import TodoModel from "@/models/Todo";
+import { verifyToken } from "@/utils/auth";
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 
 
-// ============================================
-// Authentication
-// ============================================
+// =====================================================
+// Get Authenticated User
+// =====================================================
 
 async function getAuthenticatedUserId() {
 
   const cookieStore = await cookies();
 
   const token =
-    cookieStore.get('token')?.value;
+    cookieStore.get("token")?.value;
+
 
   if (!token) {
     return null;
   }
 
-  try {
 
-    const decoded =
-      verifyToken(token);
+  const decoded =
+    verifyToken(token);
 
-    if (!decoded?.userId) {
-      return null;
-    }
 
-    return decoded.userId;
-
-  } catch (error) {
-
-    console.error(
-      'Token verification error:',
-      error
-    );
-
+  if (!decoded) {
     return null;
   }
+
+
+  return decoded.userId || null;
 }
 
 
-// ============================================
-// POST
-// Create Task
-// ============================================
+// =====================================================
+// POST - Create Task
+// =====================================================
 
 export async function POST(req) {
 
@@ -57,22 +45,33 @@ export async function POST(req) {
 
     await connectToDB();
 
+
+    // -------------------------------
+    // Authentication
+    // -------------------------------
+
     const userId =
       await getAuthenticatedUserId();
+
 
     if (!userId) {
 
       return NextResponse.json(
         {
           success: false,
-          error: 'Unauthorized',
+          message: "Unauthorized",
         },
         {
           status: 401,
         }
       );
+
     }
 
+
+    // -------------------------------
+    // Get Body
+    // -------------------------------
 
     const body =
       await req.json();
@@ -88,37 +87,21 @@ export async function POST(req) {
     } = body;
 
 
-    // ========================================
+    // -------------------------------
     // Validation
-    // ========================================
+    // -------------------------------
 
     if (
-      typeof name !== 'string' ||
-      !name.trim()
-    ) {
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'نام کار الزامی است',
-        },
-        {
-          status: 400,
-        }
-      );
-
-    }
-
-
-    if (
+      !name?.trim() ||
       !date ||
-      typeof date !== 'string'
+      !time
     ) {
 
       return NextResponse.json(
         {
           success: false,
-          error: 'تاریخ الزامی است',
+          message:
+            "Missing required fields: name, date, or time",
         },
         {
           status: 400,
@@ -128,44 +111,9 @@ export async function POST(req) {
     }
 
 
-    if (
-      !time ||
-      typeof time !== 'string'
-    ) {
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'زمان الزامی است',
-        },
-        {
-          status: 400,
-        }
-      );
-
-    }
-
-
-    if (
-      !isValidCategory(category)
-    ) {
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'دسته‌بندی نامعتبر است',
-        },
-        {
-          status: 400,
-        }
-      );
-
-    }
-
-
-    // ========================================
-    // Create
-    // ========================================
+    // -------------------------------
+    // Create Task
+    // -------------------------------
 
     const newTask =
       await TodoModel.create({
@@ -173,23 +121,26 @@ export async function POST(req) {
         name: name.trim(),
 
         description:
-          typeof description === 'string'
-            ? description.trim()
-            : '',
+          description || "",
 
-        category,
+        category:
+          category || "",
 
         date,
 
         time,
 
         isCompleted:
-          Boolean(isCompleted),
+          isCompleted ?? false,
 
         userId,
 
       });
 
+
+    // -------------------------------
+    // Response
+    // -------------------------------
 
     return NextResponse.json(
       {
@@ -201,32 +152,30 @@ export async function POST(req) {
       }
     );
 
-
   } catch (error) {
 
     console.error(
-      'POST /api/tasks:',
+      "POST Task Error:",
       error
     );
 
     return NextResponse.json(
       {
         success: false,
-        error: 'خطای داخلی سرور',
+        message:
+          "Internal server error",
       },
       {
         status: 500,
       }
     );
-
   }
 }
 
 
-// ============================================
-// GET
-// Get User Tasks
-// ============================================
+// =====================================================
+// GET - Get Tasks
+// =====================================================
 
 export async function GET(req) {
 
@@ -234,15 +183,21 @@ export async function GET(req) {
 
     await connectToDB();
 
+
+    // -------------------------------
+    // Authentication
+    // -------------------------------
+
     const userId =
       await getAuthenticatedUserId();
+
 
     if (!userId) {
 
       return NextResponse.json(
         {
           success: false,
-          error: 'Unauthorized',
+          message: "Unauthorized",
         },
         {
           status: 401,
@@ -252,84 +207,87 @@ export async function GET(req) {
     }
 
 
+    // -------------------------------
+    // Query Parameters
+    // -------------------------------
+
     const { searchParams } =
       new URL(req.url);
 
 
-    const category =
-      searchParams.get('category');
+    const categoryId =
+      searchParams.get("category");
+
 
     const date =
-      searchParams.get('date');
+      searchParams.get("date");
 
 
-    // ========================================
-    // IMPORTANT
-    // همیشه userId وجود دارد
-    // ========================================
+    // -------------------------------
+    // Base Query
+    // -------------------------------
 
     const query = {
       userId,
     };
 
 
-    if (category) {
+    // -------------------------------
+    // Category Filter
+    // -------------------------------
 
-      if (!isValidCategory(category)) {
-
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'دسته‌بندی نامعتبر است',
-          },
-          {
-            status: 400,
-          }
-        );
-
-      }
-
-      query.category = category;
+    if (categoryId) {
+      query.category = categoryId;
     }
 
+
+    // -------------------------------
+    // Date Filter
+    // -------------------------------
 
     if (date) {
       query.date = date;
     }
 
 
+    // -------------------------------
+    // Get Tasks
+    // -------------------------------
+
     const todos =
       await TodoModel
         .find(query)
         .sort({
-          date: 1,
+          date: -1,
           time: 1,
-        })
-        .lean();
+        });
 
+
+    // -------------------------------
+    // Response
+    // -------------------------------
 
     return NextResponse.json({
       success: true,
       data: todos,
     });
 
-
   } catch (error) {
 
     console.error(
-      'GET /api/tasks:',
+      "GET Tasks Error:",
       error
     );
 
     return NextResponse.json(
       {
         success: false,
-        error: 'خطای داخلی سرور',
+        message:
+          "Internal server error",
       },
       {
         status: 500,
       }
     );
-
   }
 }

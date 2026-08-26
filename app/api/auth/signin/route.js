@@ -1,5 +1,3 @@
-// app/api/auth/signin/route.js
-
 import UserModel from "@/models/User";
 import connectToDB from "@/configs/db";
 import {
@@ -8,71 +6,77 @@ import {
 } from "@/utils/auth";
 import { NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+
 export async function POST(req) {
+
   try {
-    // اتصال به دیتابیس
+
     await connectToDB();
 
-    // دریافت اطلاعات
     const body = await req.json();
 
-    const email = body.email?.trim().toLowerCase();
-    const password = body.password;
-
-    // =========================
-    // Validation
-    // =========================
-
-    if (!email || !password) {
-      return NextResponse.json(
-        {
-          message: "ایمیل و رمز عبور الزامی است.",
-        },
-        {
-          status: 422,
-        }
-      );
-    }
-
-    // بررسی ساده فرمت ایمیل
-    const emailRegex =
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        {
-          message: "فرمت ایمیل صحیح نیست.",
-        },
-        {
-          status: 422,
-        }
-      );
-    }
-
-    // =========================
-    // پیدا کردن کاربر
-    // =========================
-
-    const user = await UserModel.findOne({
+    const {
       email,
-    });
+      password,
+    } = body;
 
-    // بهتر است مشخص نکنیم ایمیل وجود دارد یا رمز اشتباه است
-    // تا اطلاعاتی درباره کاربران دیتابیس لو نرود.
-    if (!user) {
+
+    // ==============================
+    // Validation
+    // ==============================
+
+    if (
+      !email?.trim() ||
+      !password?.trim()
+    ) {
+
       return NextResponse.json(
         {
-          message: "ایمیل یا رمز عبور اشتباه است.",
+          success: false,
+          message: "Email and password are required",
+        },
+        {
+          status: 422,
+        }
+      );
+
+    }
+
+
+    const normalizedEmail =
+      email.trim().toLowerCase();
+
+
+    // ==============================
+    // Find User
+    // ==============================
+
+    const user =
+      await UserModel.findOne({
+        email: normalizedEmail,
+      });
+
+
+    if (!user) {
+
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Email or password is incorrect",
         },
         {
           status: 401,
         }
       );
+
     }
 
-    // =========================
-    // بررسی Password
-    // =========================
+
+    // ==============================
+    // Verify Password
+    // ==============================
 
     const isValidPassword =
       await verifyPassword(
@@ -80,42 +84,49 @@ export async function POST(req) {
         user.password
       );
 
+
     if (!isValidPassword) {
+
       return NextResponse.json(
         {
-          message: "ایمیل یا رمز عبور اشتباه است.",
+          success: false,
+          message:
+            "Email or password is incorrect",
         },
         {
           status: 401,
         }
       );
+
     }
 
-    // =========================
-    // Generate JWT
-    // =========================
 
-    const token = generateToken({
-      userId: user._id.toString(),
-    });
+    // ==============================
+    // Generate Token
+    // ==============================
 
-    // =========================
+    const token =
+      generateToken({
+        userId: user._id.toString(),
+      });
+
+
+    // ==============================
     // Response
-    // =========================
+    // ==============================
 
-    const response = NextResponse.json(
-      {
-        success: true,
-        message: "ورود با موفقیت انجام شد.",
-      },
-      {
-        status: 200,
-      }
-    );
+    const response =
+      NextResponse.json(
+        {
+          success: true,
+          message:
+            "User logged in successfully",
+        },
+        {
+          status: 200,
+        }
+      );
 
-    // =========================
-    // Secure Cookie
-    // =========================
 
     response.cookies.set(
       "token",
@@ -123,34 +134,38 @@ export async function POST(req) {
       {
         httpOnly: true,
 
-        // در Production حتماً HTTPS
-        secure: process.env.NODE_ENV === "production",
+        secure:
+          process.env.NODE_ENV === "production",
 
         sameSite: "lax",
 
         path: "/",
 
-        // 24 ساعت
-        maxAge: 24 * 60 * 60,
+        maxAge:
+          24 * 60 * 60,
       }
     );
+
 
     return response;
 
   } catch (error) {
 
     console.error(
-      "Sign in error:",
+      "Signin error:",
       error
     );
 
     return NextResponse.json(
       {
-        message: "خطای داخلی سرور.",
+        success: false,
+        message:
+          "Internal server error",
       },
       {
         status: 500,
       }
     );
+
   }
 }

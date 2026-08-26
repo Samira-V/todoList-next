@@ -1,5 +1,3 @@
-// app/api/auth/signup/route.js
-
 import UserModel from "@/models/User";
 import connectToDB from "@/configs/db";
 import {
@@ -11,140 +9,124 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 export async function POST(req) {
+
   try {
-    // =========================
-    // Connect DB
-    // =========================
 
     await connectToDB();
 
-    // =========================
-    // Get body
-    // =========================
-
     const body = await req.json();
 
-    const name = body.name?.trim();
-    const email = body.email?.trim().toLowerCase();
-    const password = body.password;
+    const {
+      name,
+      email,
+      password,
+    } = body;
 
-    // =========================
+
+    // ==============================
     // Validation
-    // =========================
+    // ==============================
 
-    if (!name || !email || !password) {
+    if (
+      !name?.trim() ||
+      !email?.trim() ||
+      !password?.trim()
+    ) {
+
       return NextResponse.json(
         {
-          message: "نام، ایمیل و رمز عبور الزامی است.",
+          success: false,
+          message: "Data is not valid",
         },
         {
           status: 422,
         }
       );
+
     }
 
-    // محدودیت طول نام
-    if (name.length < 2 || name.length > 50) {
-      return NextResponse.json(
-        {
-          message: "نام باید بین ۲ تا ۵۰ کاراکتر باشد.",
-        },
-        {
-          status: 422,
-        }
-      );
-    }
 
-    // بررسی ایمیل
-    const emailRegex =
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // ==============================
+    // Check Existing User
+    // ==============================
 
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        {
-          message: "فرمت ایمیل صحیح نیست.",
-        },
-        {
-          status: 422,
-        }
-      );
-    }
+    const normalizedEmail =
+      email.trim().toLowerCase();
 
-    // حداقل طول Password
-    if (password.length < 8) {
-      return NextResponse.json(
-        {
-          message: "رمز عبور باید حداقل ۸ کاراکتر باشد.",
-        },
-        {
-          status: 422,
-        }
-      );
-    }
-
-    // =========================
-    // Check existing user
-    // =========================
-
-    const existingUser =
+    const isUserExist =
       await UserModel.findOne({
-        email,
+        email: normalizedEmail,
       });
 
-    if (existingUser) {
+
+    if (isUserExist) {
+
       return NextResponse.json(
         {
-          message: "این ایمیل قبلاً ثبت شده است.",
+          success: false,
+          message: "This email already exists",
         },
         {
           status: 409,
         }
       );
+
     }
 
-    // =========================
-    // Hash password
-    // =========================
+
+    // ==============================
+    // Hash Password
+    // ==============================
 
     const hashedPassword =
       await hashPassword(password);
 
-    // =========================
-    // Create user
-    // =========================
 
-    const newUser =
+    // ==============================
+    // Create User
+    // ==============================
+
+    const user =
       await UserModel.create({
-        name,
-        email,
+
+        name: name.trim(),
+
+        email: normalizedEmail,
+
         password: hashedPassword,
+
       });
 
-    // =========================
-    // Generate token
-    // =========================
 
-    const token = generateToken({
-      userId: newUser._id.toString(),
-    });
+    // ==============================
+    // Generate Token
+    // ==============================
 
-    // =========================
+    const token =
+      generateToken({
+        userId: user._id.toString(),
+      });
+
+
+    // ==============================
     // Response
-    // =========================
+    // ==============================
 
-    const response = NextResponse.json(
-      {
-        success: true,
-        message: "ثبت‌نام با موفقیت انجام شد.",
-      },
-      {
-        status: 201,
-      }
-    );
+    const response =
+      NextResponse.json(
+        {
+          success: true,
+          message: "User created successfully",
+        },
+        {
+          status: 201,
+        }
+      );
 
-    // =========================
-    // Secure Cookie
-    // =========================
+
+    // ==============================
+    // Cookie
+    // ==============================
 
     response.cookies.set(
       "token",
@@ -159,14 +141,16 @@ export async function POST(req) {
 
         path: "/",
 
-        // 24 ساعت
-        maxAge: 24 * 60 * 60,
+        maxAge:
+          24 * 60 * 60,
       }
     );
+
 
     return response;
 
   } catch (error) {
+
     console.error(
       "Signup error:",
       error
@@ -174,11 +158,14 @@ export async function POST(req) {
 
     return NextResponse.json(
       {
-        message: "خطای داخلی سرور.",
+        success: false,
+        message:
+          "Internal server error",
       },
       {
         status: 500,
       }
     );
+
   }
 }
