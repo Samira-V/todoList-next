@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { getTodayDate } from "@/utils/auth";
+import { getTodayDate } from "@/utils/date";
 import Header from "@/components/ui/Header/Header";
 import {
   getCategoryLabel,
