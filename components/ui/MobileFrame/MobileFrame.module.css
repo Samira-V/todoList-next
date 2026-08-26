@@ -1,0 +1,22 @@
+
+.frame {
+  width: 360px;
+  height: 720px;
+  background-color: var(--bg-primary, #0b1120);
+  border-radius: 36px;
+  border: 8px solid #1e293b;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.content {
+  flex: 1;
+  padding: 24px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  scroll-behavior: smooth;
+}
