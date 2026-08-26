@@ -1,322 +1,129 @@
 'use client';
 
-import React, {
-  useEffect,
-  useState,
-} from 'react';
-
-import {
-  useRouter,
-  useSearchParams,
-} from 'next/navigation';
-
+import React, { Suspense, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/Input/Input';
 import { Button } from '@/components/ui/Button/Button';
 import Header from '@/components/ui/Header/Header';
 
-import {
-  CATEGORY_CONFIG,
-} from '@/utils/category';
 
+function AddTaskContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-export default function AddTaskPage() {
+  const taskId = searchParams.get('id');
 
-  const router =
-    useRouter();
+  const isEditMode = Boolean(taskId);
 
-  const searchParams =
-    useSearchParams();
+  const [taskData, setTaskData] = useState({
+    name: '',
+    description: '',
+    category: 'work',
+    date: '',
+    time: '',
+    isCompleted: false,
+  });
 
-
-  const taskId =
-    searchParams.get('id');
-
-
-  const isEditMode =
-    Boolean(taskId);
-
-
-  const [taskData, setTaskData] =
-    useState({
-
-      name: '',
-      description: '',
-      category: 'work',
-      date: '',
-      time: '',
-      isCompleted: false,
-
-    });
-
-
-  const [loading, setLoading] =
-    useState(isEditMode);
-
-
-  const [saving, setSaving] =
-    useState(false);
-
-
-  // ==========================================
-  // GET TASK FOR EDIT
-  // ==========================================
+  // =========================
+  // دریافت Task برای ویرایش
+  // =========================
 
   useEffect(() => {
-
-    if (!isEditMode) {
-      return;
-    }
-
+    if (!isEditMode) return;
 
     const fetchTask = async () => {
-
       try {
+        const res = await fetch(`/api/tasks/${taskId}`);
 
-        setLoading(true);
-
-
-        const res =
-          await fetch(
-            `/api/tasks/${taskId}`,
-            {
-              cache: 'no-store',
-            }
-          );
-
-
-        const result =
-          await res.json();
-
+        const result = await res.json();
 
         if (!res.ok) {
-
-          alert(
-            result.error ||
-            'خطا در دریافت Task'
-          );
-
-          router.replace(
-            '/task-list'
-          );
-
+          console.error(result.error || 'Task not found');
           return;
         }
 
-
-        const task =
-          result.data;
-
+        const task = result.data;
 
         setTaskData({
-
-          name:
-            task.name || '',
-
-          description:
-            task.description || '',
-
-          category:
-            task.category || 'work',
-
-          date:
-            task.date || '',
-
-          time:
-            task.time || '',
-
-          isCompleted:
-            Boolean(task.isCompleted),
-
+          name: task.name || '',
+          description: task.description || '',
+          category: task.category || 'work',
+          date: task.date || '',
+          time: task.time || '',
+          isCompleted: task.isCompleted ?? false,
         });
 
-
       } catch (error) {
-
-        console.error(error);
-
-        alert(
-          'خطا در دریافت اطلاعات Task'
+        console.error(
+          'Error fetching task for edit:',
+          error
         );
-
-      } finally {
-
-        setLoading(false);
-
       }
-
     };
-
 
     fetchTask();
 
-  }, [
-    isEditMode,
-    taskId,
-    router,
-  ]);
+  }, [isEditMode, taskId]);
 
 
-  // ==========================================
-  // CHANGE INPUT
-  // ==========================================
-
-  const updateField = (
-    field,
-    value
-  ) => {
-
-    setTaskData(
-      prev => ({
-        ...prev,
-        [field]: value,
-      })
-    );
-
-  };
-
-
-  // ==========================================
-  // SUBMIT
-  // ==========================================
+  // =========================
+  // Submit
+  // =========================
 
   const handleSubmit = async (e) => {
-
     e.preventDefault();
 
+    const url = isEditMode
+      ? `/api/tasks/${taskId}`
+      : '/api/tasks';
 
-    if (!taskData.name.trim()) {
-
-      alert(
-        'عنوان کار را وارد کنید'
-      );
-
-      return;
-    }
-
-
-    if (!taskData.date) {
-
-      alert(
-        'تاریخ را انتخاب کنید'
-      );
-
-      return;
-    }
-
-
-    if (!taskData.time) {
-
-      alert(
-        'زمان را انتخاب کنید'
-      );
-
-      return;
-    }
-
+    const method = isEditMode
+      ? 'PUT'
+      : 'POST';
 
     try {
 
-      setSaving(true);
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(taskData),
+      });
 
-
-      const url =
-        isEditMode
-          ? `/api/tasks/${taskId}`
-          : '/api/tasks';
-
-
-      const method =
-        isEditMode
-          ? 'PUT'
-          : 'POST';
-
-
-      const res =
-        await fetch(
-          url,
-          {
-            method,
-
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-
-            body:
-              JSON.stringify(
-                taskData
-              ),
-          }
-        );
-
-
-      const result =
-        await res.json();
-
+      const result = await res.json();
 
       if (!res.ok) {
-
         alert(
           result.error ||
-          'خطا در ذخیره اطلاعات'
+          result.message ||
+          'خطا در انجام عملیات'
         );
 
         return;
       }
 
-
-      router.push(
-        '/task-list'
-      );
-
-      router.refresh();
-
+      router.push('/task-list');
 
     } catch (error) {
 
-      console.error(error);
+      console.error(
+        'Submit error:',
+        error
+      );
 
       alert(
         'خطا در ارتباط با سرور'
       );
-
-    } finally {
-
-      setSaving(false);
-
     }
-
   };
 
 
-  if (loading) {
-
-    return (
-
-      <div>
-
-        <Header
-          title="ویرایش کار"
-        />
-
-        <p
-          style={{
-            textAlign: 'center',
-            marginTop: 30,
-          }}
-        >
-          در حال دریافت اطلاعات...
-        </p>
-
-      </div>
-
-    );
-
-  }
-
+  // =========================
+  // Render
+  // =========================
 
   return (
-
     <div>
 
       <Header
@@ -327,19 +134,16 @@ export default function AddTaskPage() {
         }
       />
 
-
-      <form
-        onSubmit={handleSubmit}
-      >
+      <form onSubmit={handleSubmit}>
 
         <Input
           label="عنوان کار"
           value={taskData.name}
           onChange={(e) =>
-            updateField(
-              'name',
-              e.target.value
-            )
+            setTaskData({
+              ...taskData,
+              name: e.target.value,
+            })
           }
           required
         />
@@ -347,19 +151,15 @@ export default function AddTaskPage() {
 
         <Input
           label="توضیحات"
-          value={
-            taskData.description
-          }
+          value={taskData.description}
           onChange={(e) =>
-            updateField(
-              'description',
-              e.target.value
-            )
+            setTaskData({
+              ...taskData,
+              description: e.target.value,
+            })
           }
         />
 
-
-        {/* Category */}
 
         <div
           style={{
@@ -376,22 +176,18 @@ export default function AddTaskPage() {
               marginBottom: 6,
             }}
           >
-            انتخاب دسته‌بندی
+            انتخاب دسته بندی
           </label>
 
 
           <select
-            value={
-              taskData.category
-            }
-
+            value={taskData.category}
             onChange={(e) =>
-              updateField(
-                'category',
-                e.target.value
-              )
+              setTaskData({
+                ...taskData,
+                category: e.target.value,
+              })
             }
-
             style={{
               width: '100%',
               padding: 12,
@@ -400,25 +196,26 @@ export default function AddTaskPage() {
               border:
                 '1px solid var(--border-color, #2e3a59)',
               borderRadius: 8,
-              color: '#fff',
+              color: '#ffffff',
               outline: 'none',
             }}
           >
 
-            {Object.entries(
-              CATEGORY_CONFIG
-            ).map(
-              ([value, config]) => (
+            <option value="work">
+              کاری
+            </option>
 
-                <option
-                  key={value}
-                  value={value}
-                >
-                  {config.label}
-                </option>
+            <option value="meet">
+              ملاقات
+            </option>
 
-              )
-            )}
+            <option value="personal">
+              شخصی
+            </option>
+
+            <option value="home">
+              خانه
+            </option>
 
           </select>
 
@@ -430,10 +227,10 @@ export default function AddTaskPage() {
           type="date"
           value={taskData.date}
           onChange={(e) =>
-            updateField(
-              'date',
-              e.target.value
-            )
+            setTaskData({
+              ...taskData,
+              date: e.target.value,
+            })
           }
         />
 
@@ -443,34 +240,52 @@ export default function AddTaskPage() {
           type="time"
           value={taskData.time}
           onChange={(e) =>
-            updateField(
-              'time',
-              e.target.value
-            )
+            setTaskData({
+              ...taskData,
+              time: e.target.value,
+            })
           }
         />
 
 
         <Button
           type="submit"
-          disabled={saving}
           style={{
             marginTop: 10,
           }}
         >
-
-          {saving
-            ? 'در حال ذخیره...'
-            : isEditMode
-              ? 'ذخیره تغییرات'
-              : 'افزودن'}
-
+          {isEditMode
+            ? 'ویرایش'
+            : 'افزودن'}
         </Button>
 
       </form>
 
     </div>
-
   );
+}
 
+
+// ========================================
+// Suspense
+// ========================================
+
+export default function AddTaskPage() {
+
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            padding: 20,
+            textAlign: 'center',
+          }}
+        >
+          در حال بارگذاری...
+        </div>
+      }
+    >
+      <AddTaskContent />
+    </Suspense>
+  );
 }
