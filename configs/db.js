@@ -1,15 +1,19 @@
-const { default: mongoose } = require("mongoose");
+import mongoose from "mongoose";
 
 const connectToDB = async () => {
   try {
-    if (mongoose.connections[0].readyState) {
+    if (mongoose.connection.readyState === 1) {
       return true;
-    } else {
-      await mongoose.connect("mongodb://localhost:27017/todolist");
-      console.log("Connect To DB Successfully :))");
     }
+
+    await mongoose.connect(process.env.MONGODB_URI);
+
+    console.log("Connect To DB Successfully :))");
+
+    return true;
   } catch (err) {
-    console.log("DB Connection Has Error =>", err);
+    console.error("DB Connection Has Error =>", err);
+    throw err;
   }
 };
 
